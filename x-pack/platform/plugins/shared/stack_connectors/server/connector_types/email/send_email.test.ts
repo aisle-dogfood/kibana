@@ -513,7 +513,7 @@ describe('send_email module', () => {
           "port": 1025,
           "secure": false,
           "tls": Object {
-            "rejectUnauthorized": false,
+            "rejectUnauthorized": true,
           },
         },
       ]
@@ -637,7 +637,7 @@ describe('send_email module', () => {
           "port": 1025,
           "secure": false,
           "tls": Object {
-            "rejectUnauthorized": false,
+            "rejectUnauthorized": true,
           },
         },
       ]
@@ -756,7 +756,7 @@ describe('send_email module', () => {
           "port": 1025,
           "secure": false,
           "tls": Object {
-            "rejectUnauthorized": false,
+            "rejectUnauthorized": true,
           },
         },
       ]
@@ -792,8 +792,8 @@ describe('send_email module', () => {
     );
     expect(result).toBe(sendMailMockResult);
 
-    // note in the object below, the rejectUnauthenticated got set to false,
-    // given the implementation allowing that for no auth and !secure.
+    // note in the object below, the transport keeps certificate validation enabled
+    // while still applying the configured custom CA and SMTP settings.
     expect(createTransportMock.mock.calls[0]).toMatchInlineSnapshot(`
       Array [
         Object {
@@ -839,8 +839,8 @@ describe('send_email module', () => {
     );
     expect(result).toBe(sendMailMockResult);
 
-    // in this case, rejectUnauthorized is true, as the custom host settings
-    // overrode the calculated value of false
+    // in this case, rejectUnauthorized remains true, and the custom host settings
+    // still override the SMTP-specific calculated values.
     expect(createTransportMock.mock.calls[0]).toMatchInlineSnapshot(`
       Array [
         Object {
