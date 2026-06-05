@@ -267,11 +267,6 @@ function getTransportConfig(
       );
       transportConfig.proxy = proxySettings.proxyUrl;
       transportConfig.headers = proxySettings.proxyHeaders;
-    } else if (!transportConfig.secure && user == null && password == null) {
-      // special case - if secure:false && user:null && password:null set
-      // rejectUnauthorized false, because simple/test servers that don't even
-      // authenticate rarely have valid certs; eg cloud proxy, and npm maildev
-      transportConfig.tls = { rejectUnauthorized: false };
     } else {
       transportConfig.tls = getNodeSSLOptions(logger, generalSSLSettings.verificationMode);
     }
