@@ -114,7 +114,7 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
         description: 'Test Description',
         owner: 'securitySolution',
         fetcher: {
-          skip_ssl_verification: true,
+          keep_alive: true,
         },
       };
       const step = {
@@ -159,7 +159,7 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
           body: { title: 'Test' },
         },
         fetcher: {
-          skip_ssl_verification: true,
+          keep_alive: true,
         },
       };
       const step = {
@@ -222,7 +222,7 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
   });
 
   describe('SSL verification', () => {
-    it('should create undici Agent with rejectUnauthorized: false when skip_ssl_verification is true', async () => {
+    it('should reject skip_ssl_verification and avoid making an insecure request', async () => {
       const { Agent } = await import('undici');
       const MockedAgent = Agent as jest.MockedClass<typeof Agent>;
       MockedAgent.mockClear();
@@ -248,25 +248,26 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
         mockWorkflowLogger
       );
 
-      await (kibanaStep as any)._run(stepWith);
+      const result = await (kibanaStep as any)._run(stepWith);
 
-      // Verify Agent was created with correct options
-      expect(MockedAgent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          connect: expect.objectContaining({
-            rejectUnauthorized: false,
-          }),
-        })
-      );
+      expect(result.error).toBeDefined();
+      expect(result.error.message).toContain('Disabling TLS verification is not supported');
+      expect(MockedAgent).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
 
-    it('should not create Agent when skip_ssl_verification is false or undefined', async () => {
+    it('should reject custom connect.rejectUnauthorized overrides', async () => {
       const { Agent } = await import('undici');
       const MockedAgent = Agent as jest.MockedClass<typeof Agent>;
       MockedAgent.mockClear();
 
       const stepWith = {
         title: 'Test',
+        fetcher: {
+          connect: {
+            rejectUnauthorized: false,
+          },
+        } as Record<string, unknown>,
       };
       const step = {
         id: 'test_step',
@@ -283,10 +284,12 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
         mockWorkflowLogger
       );
 
-      await (kibanaStep as any)._run(stepWith);
+      const result = await (kibanaStep as any)._run(stepWith);
 
-      // Agent should not be created
+      expect(result.error).toBeDefined();
+      expect(result.error.message).toContain('Disabling TLS verification is not supported');
       expect(MockedAgent).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -701,7 +704,6 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
       const stepWith = {
         title: 'Test',
         fetcher: {
-          skip_ssl_verification: true,
           keep_alive: true,
           max_redirects: 5,
           follow_redirects: false,
@@ -724,17 +726,19 @@ describe('KibanaActionStepImpl - Fetcher Configuration', () => {
 
       await (kibanaStep as any)._run(stepWith);
 
-      // Verify Agent was created with all options
+      // Verify Agent was created with the supported options only
       expect(MockedAgent).toHaveBeenCalledWith(
         expect.objectContaining({
-          connect: expect.objectContaining({
-            rejectUnauthorized: false,
-          }),
           keepAliveTimeout: 60000,
           keepAliveMaxTimeout: 600000,
           maxRedirections: 5,
         })
       );
+      const agentOptions = MockedAgent.mock.calls[0][0] as Record<string, unknown>;
+      expect(
+        (agentOptions.connect as { rejectUnauthorized?: boolean } | undefined)
+          ?.rejectUnauthorized
+      ).toBeUndefined();
 
       // Verify fetch options
       const fetchCall = mockedFetch.mock.calls[0];

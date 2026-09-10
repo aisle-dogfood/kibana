@@ -260,8 +260,6 @@ export class KibanaActionStepImpl extends BaseAtomicNodeImplementation<BaseStep>
 
     // Apply undici Agent with fetcher options
     if (fetcherOptions && Object.keys(fetcherOptions).length > 0) {
-      const { Agent } = await import('undici');
-
       const {
         skip_ssl_verification,
         follow_redirects,
@@ -272,10 +270,13 @@ export class KibanaActionStepImpl extends BaseAtomicNodeImplementation<BaseStep>
 
       const agentOptions: any = { ...otherOptions };
 
-      // Map our options to undici Agent options
-      if (skip_ssl_verification) {
-        agentOptions.connect = { ...(agentOptions.connect || {}), rejectUnauthorized: false };
+      if (skip_ssl_verification || agentOptions.connect?.rejectUnauthorized === false) {
+        throw new Error(
+          'Disabling TLS verification is not supported for Kibana actions. Remove fetcher.skip_ssl_verification or connect.rejectUnauthorized.'
+        );
       }
+
+      // Map our options to undici Agent options
       if (max_redirects !== undefined) {
         agentOptions.maxRedirections = max_redirects;
       }
@@ -284,7 +285,10 @@ export class KibanaActionStepImpl extends BaseAtomicNodeImplementation<BaseStep>
         agentOptions.keepAliveMaxTimeout = keep_alive ? 600000 : 0;
       }
 
-      (fetchOptions as any).dispatcher = new Agent(agentOptions);
+      if (Object.keys(agentOptions).length > 0) {
+        const { Agent } = await import('undici');
+        (fetchOptions as any).dispatcher = new Agent(agentOptions);
+      }
 
       // Handle redirect at fetch level
       if (follow_redirects === false) {
